@@ -71,11 +71,31 @@ A lista completa está no cabeçalho de [src/main.cpp](src/main.cpp).
 
 ## Biblioteca Python
 
+O ambiente é gerenciado pelo [uv](https://docs.astral.sh/uv/). Um único comando baixa
+o Python certo (versão em [.python-version](.python-version)), cria o `.venv` e instala
+tudo com as versões travadas em [uv.lock](uv.lock):
+
 ```bash
-python -m venv .venv
-.venv\Scripts\activate
-pip install -e .             # instala waveplate e arduino_elliptec (depende de pyserial)
+uv sync                          # projeto + todos os grupos de dependências
+uv run python hardware_test.py   # roda qualquer script dentro do ambiente
 ```
+
+Instalar o uv no Windows (uma vez): `powershell -c "irm https://astral.sh/uv/install.ps1 | iex"`
+
+| Grupo | Pacotes | Para quê |
+|---|---|---|
+| *(base)* | `pyserial` | bibliotecas `waveplate` e `arduino_elliptec` |
+| `test` | `numpy`, `matplotlib` | testes de histerese e gráficos |
+| `notebooks` | `ipykernel`, `numpy`, `matplotlib` | notebooks tutoriais no VS Code/Jupyter |
+| `lab` | `pylablib-lightweight`, `pyft232`, `numba`, `scipy`, `tqdm` | códigos locais de `bell-measurements-main/` (Elliptec original) |
+
+`uv sync` instala todos os grupos (`default-groups = "all"` no
+[pyproject.toml](pyproject.toml)). Para instalar só o básico: `uv sync --no-default-groups`.
+Para adicionar um pacote: `uv add <pacote>` (ou `uv add --group lab <pacote>`).
+
+Não vêm do PyPI e precisam do instalador do fabricante: o SDK da **Swabian TimeTagger**
+(`--detector timetagger`) e o driver/DLL do **power meter Thorlabs** (usado pelo
+`TLPMX.py`/`EASYPM.py`).
 
 ```python
 from waveplate import WavePlate

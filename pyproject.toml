@@ -6,8 +6,37 @@ build-backend = "setuptools.build_meta"
 name = "arduino-waveplate"
 version = "0.1.0"
 description = "Controle das lâminas motorizadas (Arduino + CNC Shield), com interface compatível com a Thorlabs Elliptec"
-requires-python = ">=3.8"
-dependencies = ["pyserial"]
+readme = "README.md"
+requires-python = ">=3.10"
+# Só o necessário para usar as bibliotecas waveplate e arduino_elliptec
+dependencies = ["pyserial>=3.5"]
+
+[dependency-groups]
+# Testes de hardware/histerese e análise dos resultados
+test = [
+    "numpy>=1.24",
+    "matplotlib>=3.7",
+]
+# Notebooks tutoriais (VS Code / Jupyter)
+notebooks = [
+    "ipykernel>=6.29",
+    "matplotlib>=3.7",
+    "numpy>=1.24",
+]
+# Código local do laboratório (bell-measurements-main, fora do git):
+# Elliptec original (pylablib, versão sem GUI/PyQt), ajustes (scipy) e
+# barras de progresso (tqdm)
+lab = [
+    "pylablib-lightweight>=1.4",
+    "pyft232>=0.12",            # pylablib.devices.Thorlabs importa ft232 ao carregar
+    "numba>=0.60",              # pylablib.devices.Thorlabs importa numba ao carregar
+    "scipy>=1.10",
+    "tqdm>=4.66",
+]
+
+[tool.uv]
+# "uv sync" instala o projeto + todos os grupos acima
+default-groups = "all"
 
 [tool.setuptools]
 py-modules = ["waveplate", "arduino_elliptec"]
