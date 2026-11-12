@@ -13,34 +13,68 @@ PC (Python) ──USB/serial 115200── Arduino Uno + CNC Shield v3 ── dri
 
 ## Estrutura do repositório
 
-| Caminho | O que é |
-|---|---|
-| [src/main.cpp](src/main.cpp) | Firmware: perfil de movimento com velocidade mínima, até 4 eixos independentes, referência no fim de curso, protocolo serial em texto |
-| [platformio.ini](platformio.ini) | Ambientes de compilação `uno` e `nano` |
-| [waveplate.py](waveplate.py) | Biblioteca principal: classe `WavePlate` (um objeto por eixo), `open_plates()` |
-| [arduino_elliptec.py](arduino_elliptec.py) | Camada compatível com a Elliptec: `EasyMotor` / `ElliptecMotor` (`move_to(pos, addr=)`, `home(addr=[...])`, `close()`) |
-| [waveplate_cli.py](waveplate_cli.py) | Controle interativo de uma lâmina pelo terminal |
-| [test.py](test.py) | Exemplo mínimo de uso da `WavePlate` |
-| [waveplate_tutorial.ipynb](waveplate_tutorial.ipynb) | Tutorial da biblioteca `waveplate` |
-| [arduino_elliptec_tutorial.ipynb](arduino_elliptec_tutorial.ipynb) | Tutorial da troca Elliptec → Arduino |
-| [motor_test.py](motor_test.py) | Diagnóstico de bancada de motores soltos (porta, torque, microstep, perda de passos) |
-| [hardware_test.py](hardware_test.py) | Bateria completa de testes de hardware + software (usa o fim de curso como referência) |
-| [hardware_test_x.py](hardware_test_x.py) | Mesma bateria, só com a lâmina X |
-| [features_test.py](features_test.py) | Testes de `set_approach`, `set_zero` e `calibrate` |
-| [hysteresis_test.py](hysteresis_test.py) | Testes ópticos de folga/histerese com polarizadores e detector |
-| [hysteresis_test_x.py](hysteresis_test_x.py) | Mesmos testes ópticos, só com a lâmina X |
-| [analyze_results.py](analyze_results.py) | Resume a histerese máxima medida em `test_results/` |
-| [pyproject.toml](pyproject.toml) | Empacotamento (`pip install -e .`) |
+```
+lamina_motorizada/
+├── firmware/                 código do Arduino (PlatformIO)
+│   ├── src/main.cpp          firmware: movimento, referência, protocolo serial
+│   └── include/ lib/ test/   pastas padrão do PlatformIO (vazias)
+├── library/                  biblioteca Python (base, instalada pelo uv)
+│   ├── waveplate.py
+│   ├── arduino_elliptec.py
+│   └── waveplate_cli.py
+├── tests/                    testes contra o hardware real + análise
+├── tutorials/                notebooks e exemplo mínimo
+├── platformio.ini            configuração do PlatformIO (aponta para firmware/)
+├── pyproject.toml, uv.lock   dependências Python (uv)
+├── test_results/             resultados dos testes (local, fora do git)
+└── bell-measurements-main/   códigos do laboratório (local, fora do git)
+```
 
-Pastas `include/`, `lib/` e `test/` são do modelo padrão do PlatformIO (vazias por enquanto).
+### firmware/
+
+| Arquivo | O que é |
+|---|---|
+| [firmware/src/main.cpp](firmware/src/main.cpp) | Perfil de movimento com velocidade mínima, até 4 eixos independentes, referência no fim de curso, protocolo serial em texto |
+
+### library/ — biblioteca
+
+| Arquivo | O que é |
+|---|---|
+| [waveplate.py](library/waveplate.py) | Biblioteca principal: classe `WavePlate` (um objeto por eixo), `open_plates()` |
+| [arduino_elliptec.py](library/arduino_elliptec.py) | Camada compatível com a Elliptec: `EasyMotor` / `ElliptecMotor` (`move_to(pos, addr=)`, `home(addr=[...])`, `close()`) |
+| [waveplate_cli.py](library/waveplate_cli.py) | Controle interativo de uma lâmina pelo terminal (`uv run waveplate-cli`) |
+
+Os módulos são instalados no nível superior: `import waveplate` e
+`from arduino_elliptec import EasyMotor` funcionam de qualquer pasta, sem mexer no `sys.path`.
+
+### tests/ — testes
+
+| Arquivo | O que é |
+|---|---|
+| [motor_test.py](tests/motor_test.py) | Diagnóstico de bancada de motores soltos (porta, torque, microstep, perda de passos) |
+| [hardware_test.py](tests/hardware_test.py) | Bateria completa de testes de hardware + software (usa o fim de curso como referência) |
+| [hardware_test_x.py](tests/hardware_test_x.py) | Mesma bateria, só com a lâmina X |
+| [features_test.py](tests/features_test.py) | Testes de `set_approach`, `set_zero` e `calibrate` |
+| [hysteresis_test.py](tests/hysteresis_test.py) | Testes ópticos de folga/histerese com polarizadores e detector |
+| [hysteresis_test_x.py](tests/hysteresis_test_x.py) | Mesmos testes ópticos, só com a lâmina X |
+| [analyze_results.py](tests/analyze_results.py) | Resume a histerese máxima medida em `test_results/` |
+
+### tutorials/ — tutoriais
+
+| Arquivo | O que é |
+|---|---|
+| [waveplate_tutorial.ipynb](tutorials/waveplate_tutorial.ipynb) | Tutorial da biblioteca `waveplate` |
+| [arduino_elliptec_tutorial.ipynb](tutorials/arduino_elliptec_tutorial.ipynb) | Tutorial da troca Elliptec → Arduino |
+| [basic_example.py](tutorials/basic_example.py) | Exemplo mínimo de uso da `WavePlate` |
 
 > **bell-measurements-main/** (códigos e notebooks do laboratório que usam as Elliptec)
 > não faz parte deste repositório: fica só na máquina local, na raiz do projeto.
-> `hysteresis_test.py` usa o `EASYPM.py` dessa pasta para ler o power meter Thorlabs.
+> `tests/hysteresis_test.py` usa o `EASYPM.py` dessa pasta para ler o power meter Thorlabs.
 
 ## Firmware
 
-Requer o [PlatformIO](https://platformio.org/).
+Requer o [PlatformIO](https://platformio.org/). O código fica em `firmware/`, mas os comandos
+rodam na raiz do projeto (onde está o `platformio.ini`).
 
 ```bash
 pio run -t upload            # compila e grava no Uno
@@ -48,7 +82,7 @@ pio run -e nano -t upload    # se a placa for um Nano
 pio device monitor           # teste manual: digite "X G 90", "X P", "?" ...
 ```
 
-Os eixos ligados são definidos em `EIXOS_CFG` no início de [src/main.cpp](src/main.cpp)
+Os eixos ligados são definidos em `EIXOS_CFG` no início de [firmware/src/main.cpp](firmware/src/main.cpp)
 (pinos, microstep, redução, sentido). Com o padrão (1/8 de passo, redução 5:1) são
 22,22 micropassos por grau da lâmina (≈ 0,045°).
 
@@ -67,7 +101,7 @@ Cada linha começa com a letra do eixo; a resposta volta com a mesma letra.
 | `X F` / `X I` | lê o fim de curso / configuração | `X FIM 1`, `X INFO ...` |
 | `?` | lista os eixos | `READY X Y` |
 
-A lista completa está no cabeçalho de [src/main.cpp](src/main.cpp).
+A lista completa está no cabeçalho de [firmware/src/main.cpp](firmware/src/main.cpp).
 
 ## Biblioteca Python
 
@@ -77,7 +111,8 @@ tudo com as versões travadas em [uv.lock](uv.lock):
 
 ```bash
 uv sync                          # projeto + todos os grupos de dependências
-uv run python hardware_test.py   # roda qualquer script dentro do ambiente
+uv run python tests/hardware_test.py   # roda qualquer script dentro do ambiente
+uv run waveplate-cli                   # controle interativo de uma lâmina
 ```
 
 Instalar o uv no Windows (uma vez): `powershell -c "irm https://astral.sh/uv/install.ps1 | iex"`
@@ -124,15 +159,15 @@ Atenção: o zero é onde o fim de curso aciona, não o zero de fábrica da Thor
 
 ## Testes
 
-Todos rodam contra o hardware real e gravam um JSON em `test_results/` (pasta fora do
-git). Use `--list` em cada script para ver os testes disponíveis.
+Todos rodam contra o hardware real e gravam os resultados em `test_results/`, na raiz
+do projeto (pasta fora do git). Use `--list` em cada script para ver os testes disponíveis.
 
 ```bash
-python motor_test.py --axes X Y           # motores soltos, diagnóstico guiado
-python hardware_test.py --quick           # bateria de hardware + software
-python features_test.py                   # aproximação, zero de software, calibrate
-python hysteresis_test.py --element hwp   # óptico: laser → P1 → lâmina → P2 → detector
-python analyze_results.py                 # resumo da histerese medida
+uv run python tests/motor_test.py --axes X Y           # motores soltos, diagnóstico guiado
+uv run python tests/hardware_test.py --quick           # bateria de hardware + software
+uv run python tests/features_test.py                   # aproximação, zero de software, calibrate
+uv run python tests/hysteresis_test.py --element hwp   # óptico: laser → P1 → lâmina → P2 → detector
+uv run python tests/analyze_results.py                 # resumo da histerese medida
 ```
 
 As lâminas dão várias voltas durante os testes: confira que nenhum cabo impede a rotação.
