@@ -18,12 +18,12 @@ Testes (veja --list):
                torque [pergunta], reconnect
 
 Uso:
-    python hardware_test_x.py                       # X na COM4
-    python hardware_test_x.py --port COM5
-    python hardware_test_x.py --quick               # pula os demorados
-    python hardware_test_x.py --no-interactive      # sem perguntas
-    python hardware_test_x.py --only edge revolution
-    python hardware_test_x.py --list
+    python tests/hardware_test_x.py                       # X na COM4
+    python tests/hardware_test_x.py --port COM5
+    python tests/hardware_test_x.py --quick               # pula os demorados
+    python tests/hardware_test_x.py --no-interactive      # sem perguntas
+    python tests/hardware_test_x.py --only edge revolution
+    python tests/hardware_test_x.py --list
 
 Aceita as mesmas opções de hardware_test.py, menos --plates. Resultado: uma
 tabela no fim e um JSON em test_results/.

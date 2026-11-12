@@ -19,10 +19,10 @@ Testes (veja --list):
                                       calibrate com vários endereços
 
 Uso:
-    python features_test.py                          # X na COM4
-    python features_test.py --quick                  # approach-history mais curto
-    python features_test.py --only approach-history --overshoots 3 10 30 60
-    python features_test.py --plates X Y             # inclui a Y no EasyMotor
+    python tests/features_test.py                          # X na COM4
+    python tests/features_test.py --quick                  # approach-history mais curto
+    python tests/features_test.py --only approach-history --overshoots 3 10 30 60
+    python tests/features_test.py --plates X Y             # inclui a Y no EasyMotor
 
 Opções extras deste arquivo:
     --overshoots GRAUS ...   overshoots testados no approach-history (padrão 3 10 30)

@@ -1,7 +1,7 @@
 """
 Bateria de testes de hardware + software das lâminas motorizadas.
 
-Roda contra o Arduino de verdade (firmware src/main.cpp) usando waveplate.py e
+Roda contra o Arduino de verdade (firmware em firmware/src/main.cpp) usando waveplate.py e
 arduino_elliptec.py. Não precisa de óptica: a referência externa é o próprio
 fim de curso. A "borda" (o ângulo comandado em que ele passa a ler acionado,
 chegando sempre pelo mesmo lado) é medida com resolução de um micropasso e
@@ -10,13 +10,13 @@ repetibilidade do zero. Para medir folga das engrenagens com luz, veja
 hysteresis_test.py.
 
 Uso:
-    python hardware_test.py                         # COM4, lâminas X e Y
-    python hardware_test.py --port COM5 --plates X Y Z
-    python hardware_test.py --plates COM4:X COM5:X  # lâminas em Arduinos diferentes
-    python hardware_test.py --quick                 # pula os testes demorados
-    python hardware_test.py --only simultaneous speed-limit
-    python hardware_test.py --no-interactive        # sem perguntas (só automático)
-    python hardware_test.py --list                  # lista os testes
+    python tests/hardware_test.py                         # COM4, lâminas X e Y
+    python tests/hardware_test.py --port COM5 --plates X Y Z
+    python tests/hardware_test.py --plates COM4:X COM5:X  # lâminas em Arduinos diferentes
+    python tests/hardware_test.py --quick                 # pula os testes demorados
+    python tests/hardware_test.py --only simultaneous speed-limit
+    python tests/hardware_test.py --no-interactive        # sem perguntas (só automático)
+    python tests/hardware_test.py --list                  # lista os testes
 
 Grupos de testes (veja --list):
   básico       conexão, configurações, validação de comandos, robustez da
@@ -57,7 +57,7 @@ import serial
 from arduino_elliptec import ArduinoElliptec
 from waveplate import Settings, WavePlate, WavePlateError
 
-# ── o que o firmware deveria ter (src/main.cpp) ───────────────────────────────
+# ── o que o firmware deveria ter (firmware/src/main.cpp) ──────────────────────
 DEFAULT_PORT = "COM4"
 DEFAULT_PLATES = ("X", "Y")
 FULL_STEPS_PER_REV = 200     # PASSOS_POR_VOLTA_MOTOR
@@ -74,7 +74,7 @@ TIMING_TOL = 0.15            # tempo de movimento: ±15 % do teórico...
 TIMING_TOL_S = 0.05          # ...+ 50 ms
 SLOWDOWN_TOL = 1.10          # juntas podem levar até 10 % a mais que a mais lenta sozinha
 
-RESULTS_DIR = Path(__file__).resolve().parent / "test_results"
+RESULTS_DIR = Path(__file__).resolve().parent.parent / "test_results"   # na raiz do projeto
 
 
 # ══════════════════════════════════════════════════════════════════════════════

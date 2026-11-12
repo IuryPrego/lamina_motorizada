@@ -43,10 +43,10 @@ TESTES (--list)
     crosstalk  a outra lâmina andando perturba esta? (precisa de --other)
 
 Uso:
-    python hysteresis_test.py --plate X --element hwp
-    python hysteresis_test.py --plate COM4:Y --element polarizer --only sweep loop
-    python hysteresis_test.py --plate X --other Y --only sweep crosstalk
-    python hysteresis_test.py --quick                     # ~metade do tempo
+    python tests/hysteresis_test.py --plate X --element hwp
+    python tests/hysteresis_test.py --plate COM4:Y --element polarizer --only sweep loop
+    python tests/hysteresis_test.py --plate X --other Y --only sweep crosstalk
+    python tests/hysteresis_test.py --quick                     # ~metade do tempo
 
 Resultados (CSV de cada teste, resumo JSON e gráficos PNG se houver matplotlib)
 em test_results/hysteresis_<eixo>_<data>/.
@@ -76,8 +76,8 @@ from waveplate import WavePlate, WavePlateError
 DEFAULT_PORT = "COM4"
 DEFAULT_PLATE = "X"
 MICROSTEP = 8                 # EIXOS_CFG: microstep (micropassos por passo inteiro)
-LAB_DIR = Path(__file__).resolve().parent / "bell-measurements-main"
-RESULTS_DIR = Path(__file__).resolve().parent / "test_results"
+LAB_DIR = Path(__file__).resolve().parent.parent / "bell-measurements-main"   # pasta local, fora do git
+RESULTS_DIR = Path(__file__).resolve().parent.parent / "test_results"   # na raiz do projeto
 
 HARMONIC = {"hwp": 4, "qwp": 4, "polarizer": 2}
 MAX_VISIBILITY = {"hwp": 1.0, "qwp": 1 / 3, "polarizer": 1.0}

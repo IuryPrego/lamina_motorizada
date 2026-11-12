@@ -26,15 +26,15 @@ MONTAGEM
       por ela que você vê quanto o motor girou.
 
 Uso:
-    python motor_test.py                       # COM4, motores X Y Z, com perguntas
-    python motor_test.py --port COM5
-    python motor_test.py --axes X Y            # só alguns eixos
-    python motor_test.py --no-ask              # só gira, sem perguntas (olhe os motores)
-    python motor_test.py --list-ports          # mostra as portas seriais
+    python tests/motor_test.py                       # COM4, motores X Y Z, com perguntas
+    python tests/motor_test.py --port COM5
+    python tests/motor_test.py --axes X Y            # só alguns eixos
+    python tests/motor_test.py --no-ask              # só gira, sem perguntas (olhe os motores)
+    python tests/motor_test.py --list-ports          # mostra as portas seriais
 
 Se o motor girar 8 voltas quando pedido 1 (ou 1/2, 2...), os jumpers de
 microstep embaixo do driver não batem com o firmware: veja --microstep e a
-tabela em src/main.cpp.
+tabela em firmware/src/main.cpp.
 """
 
 from __future__ import annotations
@@ -53,7 +53,7 @@ from waveplate import BAUD, WavePlate, WavePlateError
 DEFAULT_PORT = "COM4"
 DEFAULT_AXES = ("X", "Y", "Z")
 FULL_STEPS_PER_REV = 200      # motor de 1,8° por passo
-MICROSTEP = 8                 # EIXOS_CFG em src/main.cpp (jumpers MS1 e MS2 ligados)
+MICROSTEP = 8                 # EIXOS_CFG em firmware/src/main.cpp (jumpers MS1 e MS2 ligados)
 
 SLOW_RPS = 0.5                # voltas do motor por segundo nos testes devagar
 SLOW_ACCEL = 2.0              # voltas/s²
@@ -245,7 +245,7 @@ def test_motor(m: Motor, ask: Asker, rep: AxisReport, microstep: float, everyone
             real = microstep / turns
             text = (f"girou {turns:g} voltas quando pedido 1 → o driver está em microstep ≈ {real:g}, "
                     f"o firmware espera {microstep:g}. Acerte os jumpers MS1-3 embaixo do driver "
-                    f"(tabela em src/main.cpp) ou o 'microstep' do eixo em EIXOS_CFG")
+                    f"(tabela em firmware/src/main.cpp) ou o 'microstep' do eixo em EIXOS_CFG")
         else:
             text = "não girou a volta pedida: confira os jumpers de microstep e se perde passos"
         rep.problems.append(text)
@@ -378,7 +378,7 @@ def main(argv=None) -> int:
     missing = [a for a in args.axes if a not in firmware_axes]
     if missing:
         print(f"    ERRO  o firmware não tem {' '.join(missing)} (tem {' '.join(firmware_axes)}): "
-              f"confira EIXOS_CFG em src/main.cpp e grave de novo")
+              f"confira EIXOS_CFG em firmware/src/main.cpp e grave de novo")
         return 2
     print(f"    ok    {' '.join(args.axes)} existem no firmware")
 

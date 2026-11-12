@@ -16,10 +16,10 @@ hoje em hardware_test.py, features_test.py e hysteresis_test.py).
 Os valores saem em micropassos (µp) e graus; 1 µp = 1/(passos por grau) = 0.045°.
 
 Uso:
-    python analyze_results.py              # último teste completo de cada bateria
-    python analyze_results.py --detail     # todas as medidas, não só a máxima
-    python analyze_results.py --file test_results/hardware_20261111_191926.json
-    python analyze_results.py --no-later   # ignora testes rodados de novo depois (--only)
+    python tests/analyze_results.py              # último teste completo de cada bateria
+    python tests/analyze_results.py --detail     # todas as medidas, não só a máxima
+    python tests/analyze_results.py --file test_results/hardware_20261111_191926.json
+    python tests/analyze_results.py --no-later   # ignora testes rodados de novo depois (--only)
 """
 from __future__ import annotations
 
@@ -33,7 +33,7 @@ from pathlib import Path
 from typing import Callable, Dict, Iterable, List, Optional, Tuple
 
 ROOT = Path(__file__).resolve().parent
-RESULTS_DIR = ROOT / "test_results"
+RESULTS_DIR = ROOT.parent / "test_results"         # na raiz do projeto
 SUITE_SOURCES = {"hardware": "hardware_test.py", "features": "features_test.py",
                  "hysteresis": "hysteresis_test.py"}
 FALLBACK_STEPS_PER_DEGREE = 200 * 8 * 5 / 360.0     # 22.2222

@@ -34,11 +34,11 @@ TESTES (--list)
     Como cada medida funciona: veja o cabeçalho de hysteresis_test.py.
 
 Uso:
-    python hysteresis_test_x.py                          # λ/2, power meter, COM4
-    python hysteresis_test_x.py --element polarizer
-    python hysteresis_test_x.py --detector timetagger --channel 2
-    python hysteresis_test_x.py --quick                  # ~metade do tempo
-    python hysteresis_test_x.py --only sweep loop
+    python tests/hysteresis_test_x.py                          # λ/2, power meter, COM4
+    python tests/hysteresis_test_x.py --element polarizer
+    python tests/hysteresis_test_x.py --detector timetagger --channel 2
+    python tests/hysteresis_test_x.py --quick                  # ~metade do tempo
+    python tests/hysteresis_test_x.py --only sweep loop
 
 Aceita as mesmas opções de hysteresis_test.py, menos --plate e --other.
 Resultados em test_results/hysteresis_X_<data>/.
