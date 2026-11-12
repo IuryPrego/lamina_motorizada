@@ -1,7 +1,7 @@
 """
 Biblioteca para controlar as lâminas motorizadas pela serial.
 
-O Arduino (firmware em src/main.cpp) gera os passos e a aceleração; esta
+O Arduino (firmware em firmware/src/main.cpp) gera os passos e a aceleração; esta
 biblioteca só manda comandos e espera as respostas. Ângulos em graus da
 lâmina, velocidades em graus/s e aceleração em graus/s².
 
@@ -27,7 +27,7 @@ Vários eixos na mesma porta (um objeto WavePlate por eixo):
 
     plates = open_plates("COM4")          # todos os eixos do firmware: {"X": ..., "Y": ...}
 
-    Os eixos disponíveis vêm do firmware (EIXOS_CFG em src/main.cpp).
+    Os eixos disponíveis vêm do firmware (EIXOS_CFG em firmware/src/main.cpp).
 
 Zero de software e recalibração:
 

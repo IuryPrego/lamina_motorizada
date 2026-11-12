@@ -38,5 +38,12 @@ lab = [
 # "uv sync" instala o projeto + todos os grupos acima
 default-groups = "all"
 
+[project.scripts]
+waveplate-cli = "waveplate_cli:main"     # controle interativo: uv run waveplate-cli
+
 [tool.setuptools]
-py-modules = ["waveplate", "arduino_elliptec"]
+# A biblioteca fica em library/ e é instalada como módulos de nível superior:
+# "import waveplate" e "from arduino_elliptec import EasyMotor" funcionam de
+# qualquer pasta (testes, tutoriais e bell-measurements-main).
+package-dir = { "" = "library" }
+py-modules = ["waveplate", "arduino_elliptec", "waveplate_cli"]
