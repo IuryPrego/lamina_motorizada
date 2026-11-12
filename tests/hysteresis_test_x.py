@@ -30,6 +30,8 @@ TESTES (--list)
     repeat     repetibilidade de posicionamento, sem e com referência (home) no meio
     drift      passos perdidos: muitos movimentos aleatórios e volta ao ponto de trabalho
     speed      folga e passos perdidos com perfis de velocidade diferentes
+    random     N ângulos aleatórios + ajuste senoidal (pergunta pontos, médias e
+               tempo de medida no começo, antes de qualquer movimento)
 
     Como cada medida funciona: veja o cabeçalho de hysteresis_test.py.
 
@@ -39,6 +41,7 @@ Uso:
     python tests/hysteresis_test_x.py --detector timetagger --channel 2
     python tests/hysteresis_test_x.py --quick                  # ~metade do tempo
     python tests/hysteresis_test_x.py --only sweep loop
+    python tests/hysteresis_test_x.py --only random
 
 Aceita as mesmas opções de hysteresis_test.py, menos --plate e --other.
 Resultados em test_results/hysteresis_X_<data>/.

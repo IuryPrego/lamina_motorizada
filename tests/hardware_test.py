@@ -18,6 +18,10 @@ Uso:
     python tests/hardware_test.py --no-interactive        # sem perguntas (só automático)
     python tests/hardware_test.py --list                  # lista os testes
 
+Os testes que fazem perguntas ([pergunta] no --list: identify, switch-press,
+torque) rodam PRIMEIRO, antes de todos os outros. Quando eles acabam aparece
+"FIM DAS PERGUNTAS" e o resto roda sozinho — dá para sair da sala.
+
 Grupos de testes (veja --list):
   básico       conexão, configurações, validação de comandos, robustez da
                serial, leitura do fim de curso, latência
@@ -1645,7 +1649,19 @@ def select_tests(args) -> List[TestSpec]:
         if t.interactive and not args.interactive:
             continue
         chosen.append(t)
+    # os que fazem perguntas vão primeiro: depois deles dá para deixar a bancada sozinha
+    chosen.sort(key=lambda t: not t.interactive)
     return chosen
+
+
+def print_unattended_notice(selected: Sequence[TestSpec], done: int):
+    """Avisa, logo depois do último teste com pergunta, que o resto roda sozinho."""
+    if done < len(selected) and selected[done - 1].interactive and not selected[done].interactive:
+        remaining = len(selected) - done
+        print("\n" + "*" * 78)
+        print(f"  FIM DAS PERGUNTAS — os {remaining} testes restantes rodam sozinhos.")
+        print("  Pode deixar a bancada; o resumo aparece no final e fica salvo em test_results/.")
+        print("*" * 78, flush=True)
 
 
 def run_one(bench: Bench, spec: TestSpec, index: int, total: int, results: List[Result]):
@@ -1736,8 +1752,13 @@ def main(argv=None) -> int:
     results: List[Result] = []
     path = None
     try:
+        asks = sum(t.interactive for t in selected)
+        if asks:
+            print(f"\nOs {asks} testes com perguntas vêm primeiro ({', '.join(t.name for t in selected if t.interactive)}); "
+                  f"depois deles o resto roda sozinho.")
         for i, spec in enumerate(selected, 1):
             run_one(bench, spec, i, len(selected), results)
+            print_unattended_notice(selected, i)
     except KeyboardInterrupt:
         print("\nInterrompido pelo usuário — parando as lâminas.")
         bench.stop_all()

@@ -40,13 +40,22 @@ TESTES (--list)
     repeat     repetibilidade de posicionamento, sem e com referência (home) no meio
     drift      passos perdidos: muitos movimentos aleatórios e volta ao ponto de trabalho
     speed      folga e passos perdidos com perfis de velocidade diferentes
+    random     N ângulos aleatórios: intensidade em cada um e ajuste senoidal
+               (período livre) a todos os pontos; pergunta no começo quantos
+               pontos, quantas leituras por ponto e em quanto tempo
     crosstalk  a outra lâmina andando perturba esta? (precisa de --other)
+
+    Todas as perguntas são feitas no começo, antes do primeiro movimento: depois
+    a bancada roda sozinha. Cada gráfico PNG traz embaixo um texto explicando o
+    que mostra e como ler.
 
 Uso:
     python tests/hysteresis_test.py --plate X --element hwp
     python tests/hysteresis_test.py --plate COM4:Y --element polarizer --only sweep loop
     python tests/hysteresis_test.py --plate X --other Y --only sweep crosstalk
     python tests/hysteresis_test.py --quick                     # ~metade do tempo
+    python tests/hysteresis_test.py --only random               # pergunta pontos/médias/tempo
+    python tests/hysteresis_test.py --only random --points 100 --averages 10 --measure-time 2
 
 Resultados (CSV de cada teste, resumo JSON e gráficos PNG se houver matplotlib)
 em test_results/hysteresis_<eixo>_<data>/.
@@ -61,6 +70,7 @@ import math
 import random
 import statistics
 import sys
+import textwrap
 import time
 import traceback
 from dataclasses import asdict, dataclass
@@ -367,10 +377,35 @@ def styled_axes(ax, title: str, xlabel: str, ylabel: str):
     ax.set_ylabel(ylabel, color=INK)
 
 
-def save_figure(plt, fig, path: Path):
-    fig.tight_layout()
+def save_figure(plt, fig, path: Path, caption: str = ""):
+    """
+    Salva o PNG. `caption` vira um texto explicativo embaixo do gráfico (o que
+    cada eixo/cor mostra e como ler o resultado); parágrafos separados por \\n.
+    """
+    if caption:
+        width_in, height_in = fig.get_size_inches()
+        chars = int(width_in * 15)                      # ~15 caracteres por polegada em 8.5 pt
+        lines: List[str] = []
+        for paragraph in caption.split("\n"):
+            lines += textwrap.wrap(paragraph, chars) or [""]
+        text_in = len(lines) * 0.165 + 0.25
+        fig.set_size_inches(width_in, height_in + text_in)
+        fig.tight_layout(rect=(0, text_in / (height_in + text_in), 1, 1))
+        fig.text(0.02, 0.015, "\n".join(lines), ha="left", va="bottom", fontsize=8.5,
+                 color=INK, linespacing=1.4)
+    else:
+        fig.tight_layout()
     fig.savefig(path, dpi=130, facecolor=SURFACE)
     plt.close(fig)
+
+
+def microstep_axis(ax, spd: float):
+    """Eixo y extra à direita com o mesmo valor em micropassos (graus × passos/grau)."""
+    sec = ax.secondary_yaxis("right", functions=(lambda d: d * spd, lambda u: u / spd))
+    sec.set_ylabel("micropassos (µp)", color=MUTED)
+    sec.tick_params(colors=MUTED, labelsize=8)
+    sec.spines["right"].set_color(AXIS)
+    return sec
 
 
 # ── bancada ───────────────────────────────────────────────────────────────────
@@ -630,14 +665,24 @@ def test_sweep(b: Bench, r: Result):
             ax1.plot(grid, all_down[c], "o", ms=3.5, color=DOWN_COLOR, label="descendo" if c == 0 else None)
         ax1.plot(dense, f_up.value(dense), color=UP_COLOR, lw=1.2)
         ax1.plot(dense, f_down.value(dense), color=DOWN_COLOR, lw=1.2)
-        styled_axes(ax1, f"Varredura {b.plate.axis} ({b.args.element}): folga {b.backlash:+.3f}°",
-                    "", f"sinal ({b.det.unit})")
+        styled_axes(ax1, f"Varredura {b.plate.axis} ({b.args.element}): folga {b.backlash:+.3f}° "
+                         f"= {b.backlash / b.micro:+.1f} µp", "", f"sinal ({b.det.unit})")
         ax1.legend(frameon=False, labelcolor=INK)
         if local:
             ax2.plot([a for a, _ in local], [v for _, v in local], "o", ms=3.5, color=INK)
-            ax2.axhline(b.backlash, color=MUTED, lw=1, ls="--")
+            ax2.axhline(b.backlash, color=MUTED, lw=1, ls="--", label=f"média {b.backlash:+.3f}°")
+            ax2.legend(frameon=False, labelcolor=INK, loc="upper right")
         styled_axes(ax2, "Folga ponto a ponto (onde a curva é inclinada)", "ângulo comandado (°)", "folga (°)")
-        save_figure(plt, fig, b.out_dir / "sweep.png")
+        microstep_axis(ax2, b.spd)
+        save_figure(plt, fig, b.out_dir / "sweep.png", caption=(
+            f"EM CIMA: sinal do detector em cada ângulo comandado, subindo (azul) e descendo (laranja), "
+            f"com o ajuste S(θ) = a0 + B·cos({b.n}(θ − φ)) de cada sentido (linhas). Se não houvesse folga "
+            f"as duas curvas coincidiriam; a distância HORIZONTAL entre elas é a folga: o mesmo ângulo "
+            f"comandado deixa a lâmina em posições físicas diferentes conforme o sentido de chegada. "
+            f"Contraste V = {cal.visibility:.3f}: quanto maior, mais sensível a medida.\n"
+            f"EMBAIXO: essa folga calculada ponto a ponto (ângulo lido descendo − subindo), só onde a curva é "
+            f"inclinada, que é onde o sinal muda com o ângulo. A tracejada é a média. Pontos espalhados à toa "
+            f"= ruído; um padrão que se repete a cada volta = engrenagem excêntrica ou com defeito."))
 
 
 @register("approach", "mesmo ângulo chegando por baixo e por cima, com várias distâncias de aproximação")
@@ -691,10 +736,20 @@ def test_approach(b: Bench, r: Result):
         ds = [s[0] for s in summary]
         ax.errorbar(ds, [s[1] for s in summary], yerr=[math.hypot(s[2], s[3]) for s in summary],
                     fmt="o-", color=UP_COLOR, lw=2, ms=6, capsize=3)
+        ax.axhline(sat, color=MUTED, lw=1, ls="--", label=f"folga {sat:+.3f}°")
+        ax.axvline(knee, color=MUTED, lw=1, ls=":", label=f"vencida a partir de ≈ {knee:g}°")
         ax.set_xscale("log")
         styled_axes(ax, f"Chegar por cima − chegar por baixo ({b.plate.axis}, em {target:.2f}°)",
-                    "distância de aproximação (°)", "diferença (°)")
-        save_figure(plt, fig, b.out_dir / "approach.png")
+                    "distância de aproximação (°, escala log)", "diferença (°)")
+        microstep_axis(ax, b.spd)
+        ax.legend(frameon=False, labelcolor=INK, loc="upper left")
+        save_figure(plt, fig, b.out_dir / "approach.png", caption=(
+            f"Para cada distância d (eixo x): a lâmina recua d graus e volta ao mesmo alvo, uma vez vindo de baixo "
+            f"e outra vindo de cima; o ponto é (ângulo físico chegando por cima) − (chegando por baixo), lido "
+            f"pelo sinal. Barras = desvio padrão das {reps} repetições. Com d menor que a folga as engrenagens "
+            f"nem chegam a inverter o contato e a diferença é pequena; quando d vence a folga a curva satura "
+            f"no valor da folga (tracejada). Para medir sem folga, chegue sempre pelo mesmo lado vindo de "
+            f"uma distância à direita da linha pontilhada (set_approach)."))
 
 
 @register("loop", "laço de histerese: vai e volta em passos pequenos em torno do ponto de trabalho")
@@ -757,10 +812,17 @@ def test_loop(b: Bench, r: Result):
                 pts = [(a - center, m - center) for cc, dr, a, _, m in rows if cc == c and dr == direction]
                 ax.plot([p[0] for p in pts], [p[1] for p in pts], "-o", ms=3, lw=1.5, color=color,
                         label=label if c == 0 else None)
-        styled_axes(ax, f"Laço de histerese ({b.plate.axis}): folga {gap:+.3f}°",
+        styled_axes(ax, f"Laço de histerese ({b.plate.axis}): folga {gap:+.3f}° = {gap / b.micro:+.1f} µp",
                     f"comandado − {center:.2f}° (°)", f"medido − {center:.2f}° (°)")
+        ax.plot([], [], ls="--", color=MUTED, lw=1, label="ideal (medido = comandado)")
         ax.legend(frameon=False, labelcolor=INK)
-        save_figure(plt, fig, b.out_dir / "loop.png")
+        save_figure(plt, fig, b.out_dir / "loop.png", caption=(
+            f"A lâmina vai e volta ±{amplitude:g}° em passos de {step:.3f}° em torno do ponto de trabalho; "
+            f"x = ângulo comandado, y = ângulo físico lido pelo sinal. Sem folga tudo cairia na diagonal "
+            f"tracejada. Ao inverter o sentido o motor gira mas a lâmina fica parada até as engrenagens "
+            f"encostarem do outro lado: o ramo fica horizontal e o laço se abre. A distância horizontal "
+            f"entre o ramo subindo (azul) e o descendo (laranja) é a folga. Inclinação dos ramos ≠ 1 indica "
+            f"escala errada; degraus irregulares, micropassos desiguais."))
 
 
 @register("idle", "quanto a lâmina se mexe quando o driver desliga (e quando religa)")
@@ -825,10 +887,19 @@ def test_idle(b: Bench, r: Result):
         ax.plot(js, shifts, "-o", color=UP_COLOR, lw=2, ms=6, label="driver desligado")
         ax.plot(js, returns, "-o", color=DOWN_COLOR, lw=2, ms=6, label="religado")
         ax.axhline(0, color=AXIS, lw=1)
+        ax.axhspan(-b.full_step / 2, b.full_step / 2, color=GRID, alpha=0.5, lw=0,
+                   label=f"± meio passo inteiro ({b.full_step / 2:.3f}°)")
         styled_axes(ax, f"Deslocamento ao desligar o driver ({b.plate.axis})",
                     "micropasso dentro do passo inteiro", "deslocamento (°)")
+        microstep_axis(ax, b.spd)
         ax.legend(frameon=False, labelcolor=INK)
-        save_figure(plt, fig, b.out_dir / "idle.png")
+        save_figure(plt, fig, b.out_dir / "idle.png", caption=(
+            f"Para cada um dos {phases} micropassos dentro de um passo inteiro do motor (eixo x): quanto a "
+            f"lâmina se moveu ao desligar o driver (azul) e depois de religar (laranja), em relação a ela "
+            f"ligada. Sem corrente o rotor cai para o passo inteiro mais próximo, então o deslocamento depende "
+            f"do micropasso (dente de serra até ± meio passo, faixa cinza). Azul longe de zero = com "
+            f"disable_when_idle=True a lâmina não fica no ângulo pedido. Laranja em zero = ao religar ela "
+            f"volta ao lugar."))
 
 
 @register("stability", "ruído e deriva parada: driver ligado × desligado, e ruído do próprio laser")
@@ -897,8 +968,14 @@ def test_stability(b: Bench, r: Result):
             ax.plot([x[1] for x in rows], a - a.mean(), lw=2, color=color, label=label)
         styled_axes(ax, f"Lâmina parada no ponto de trabalho ({b.plate.axis})", "tempo (s)",
                     "ângulo − média (°)")
+        microstep_axis(ax, b.spd)
         ax.legend(frameon=False, labelcolor=INK)
-        save_figure(plt, fig, b.out_dir / "stability.png")
+        save_figure(plt, fig, b.out_dir / "stability.png", caption=(
+            f"Ângulo estimado pelo sinal, menos a média, com a lâmina parada no ponto de trabalho: driver "
+            f"ligado (azul, σ {s_on:.4f}°) e desligado (laranja, σ {s_off:.4f}°). A espessura da linha é o "
+            f"ruído; uma inclinação é deriva (motor esquentando, laser variando). Parte disso não é a lâmina: "
+            f"no pico, onde o sinal não depende do ângulo, o laser/detector sozinho já equivale a "
+            f"{laser_deg:.4f}° — esse é o piso de ruído da medida."))
 
 
 @register("repeat", "repetibilidade: ir a um ângulo aleatório e voltar, sem e com referência (home) no meio")
@@ -938,8 +1015,14 @@ def test_repeat(b: Bench, r: Result):
         for mode, color, label in (("move", UP_COLOR, "só posicionamento"), ("home", DOWN_COLOR, "com home()")):
             ax.plot(range(1, n + 1), results[mode], "-o", color=color, lw=2, ms=6, label=label)
         styled_axes(ax, f"Repetibilidade ({b.plate.axis})", "repetição", "posição lida (°)")
+        microstep_axis(ax, b.spd)
         ax.legend(frameon=False, labelcolor=INK)
-        save_figure(plt, fig, b.out_dir / "repeat.png")
+        save_figure(plt, fig, b.out_dir / "repeat.png", caption=(
+            f"Cada ponto é a posição lida no ponto de trabalho, sempre chegando por baixo, depois de ir a um "
+            f"ângulo aleatório e voltar (azul) ou de ir, fazer home() e voltar (laranja). Pontos numa linha "
+            f"reta horizontal = posicionamento repetível; o espalhamento vertical de cada série é a "
+            f"repetibilidade (σ no log). A distância entre as duas séries é a diferença entre o referencial "
+            f"atual e o zero refeito pelo fim de curso. Posição em graus relativa à calibração da varredura."))
 
 
 @register("drift", "passos perdidos: blocos de movimentos aleatórios e volta ao ponto de trabalho")
@@ -977,10 +1060,17 @@ def test_drift(b: Bench, r: Result):
     if plt:
         fig, ax = plt.subplots(figsize=(7, 4.2), facecolor=SURFACE)
         ax.plot([d for d, _ in series], [v - base for _, v in series], "-o", color=UP_COLOR, lw=2, ms=6)
-        ax.axhspan(-limit, limit, color=GRID, alpha=0.6, lw=0)
+        ax.axhspan(-limit, limit, color=GRID, alpha=0.6, lw=0, label=f"limite de detecção ±{limit:.3f}°")
         styled_axes(ax, f"Posição no ponto de trabalho ao longo dos movimentos ({b.plate.axis})",
                     "movimentos aleatórios feitos", "deslocamento (°)")
-        save_figure(plt, fig, b.out_dir / "drift.png")
+        microstep_axis(ax, b.spd)
+        ax.legend(frameon=False, labelcolor=INK)
+        save_figure(plt, fig, b.out_dir / "drift.png", caption=(
+            f"Depois de cada bloco de {moves} movimentos aleatórios (até ±360°), a lâmina volta ao ponto de "
+            f"trabalho e a posição é lida pelo sinal, em relação ao começo. A faixa cinza é o que não dá para "
+            f"distinguir de ruído (3× o ruído ou 1,5 µp). Pontos dentro da faixa = nenhum passo perdido. "
+            f"Fora dela = passos perdidos; degraus de {b.full_step:.2f}° (um passo inteiro) são o sinal "
+            f"típico. Leitura diferencial: imune à variação de potência do laser."))
 
 
 @register("speed", "folga, repetibilidade e passos perdidos com perfis de velocidade diferentes")
@@ -1027,7 +1117,211 @@ def test_speed(b: Bench, r: Result):
                           for row in rows])
 
 
-@register("crosstalk", "a outra lâmina dando voltas mexe ou faz vibrar esta? (precisa de --other)")
+@dataclass
+class SineFit:
+    """S(θ) = offset + amp·cos(k·(θ − phase)), período 360/k livre, com incertezas (1σ)."""
+    offset: float
+    amp: float
+    phase: float
+    k: float
+    offset_err: float
+    amp_err: float
+    phase_err: float
+    k_err: float
+    rms: float
+    r2: float
+    points: int
+
+    @property
+    def period(self) -> float:
+        return 360.0 / self.k
+
+    @property
+    def period_err(self) -> float:
+        return 360.0 * self.k_err / self.k ** 2
+
+    @property
+    def visibility(self) -> float:
+        return self.amp / self.offset if self.offset else float("nan")
+
+    def value(self, theta):
+        return self.offset + self.amp * np.cos(np.radians(self.k * (np.asarray(theta, float) - self.phase)))
+
+
+def fit_sine(theta, signal, k_guess: float) -> SineFit:
+    """
+    Ajuste senoidal com o período também livre. Para cada k candidato o resto
+    é linear (a0 + a·cos kθ + b·sin kθ); escolhe o k de menor resíduo e tira as
+    incertezas da matriz de covariância do modelo completo (4 parâmetros).
+    """
+    th = np.asarray(theta, float)
+    y = np.asarray(signal, float)
+
+    def linear(k):
+        x = np.radians(k * th)
+        m = np.column_stack([np.ones_like(x), np.cos(x), np.sin(x)])
+        coef, *_ = np.linalg.lstsq(m, y, rcond=None)
+        return coef, float(np.sum((y - m @ coef) ** 2))
+
+    ks = np.linspace(0.8 * k_guess, 1.2 * k_guess, 801)
+    k = float(ks[int(np.argmin([linear(k)[1] for k in ks]))])
+    lo, hi = k - (ks[1] - ks[0]), k + (ks[1] - ks[0])
+    for _ in range(60):                                     # refina por seção áurea
+        m1, m2 = lo + 0.382 * (hi - lo), lo + 0.618 * (hi - lo)
+        if linear(m1)[1] < linear(m2)[1]:
+            hi = m2
+        else:
+            lo = m1
+    k = (lo + hi) / 2
+    (a0, a, b), ssr = linear(k)
+
+    x = np.radians(k * th)
+    jac = np.column_stack([np.ones_like(x), np.cos(x), np.sin(x),
+                           np.radians(th) * (-a * np.sin(x) + b * np.cos(x))])
+    dof = max(1, len(y) - 4)
+    try:
+        cov = (ssr / dof) * np.linalg.inv(jac.T @ jac)
+    except np.linalg.LinAlgError:
+        cov = np.full((4, 4), np.nan)
+    sa0, sa, sb, sk = np.sqrt(np.abs(np.diag(cov)))
+    amp = math.hypot(a, b)
+    phase = (math.degrees(math.atan2(b, a)) / k) % (360.0 / k)
+    amp_err = math.hypot(a * sa, b * sb) / amp if amp else float("nan")
+    phase_err = math.degrees(math.hypot(b * sa, a * sb) / amp ** 2) / k if amp else float("nan")
+    total = float(np.sum((y - y.mean()) ** 2))
+    return SineFit(float(a0), amp, phase, k, float(sa0), amp_err, phase_err, float(sk),
+                   math.sqrt(ssr / len(y)), 1 - ssr / total if total else float("nan"), len(y))
+
+
+def timed_readings(det: Detector, count: int, window: float) -> List[float]:
+    """`count` leituras espalhadas igualmente em `window` segundos (0 = uma atrás da outra)."""
+    values = []
+    t0 = time.perf_counter()
+    for j in range(count):
+        if window > 0:
+            time.sleep(max(0.0, t0 + j * window / count - time.perf_counter()))
+        values.append(det.read())
+    return values
+
+
+@register("random", "ângulos aleatórios: intensidade em cada um e ajuste de uma senoide a todos os pontos")
+def test_random(b: Bench, r: Result):
+    a = b.args
+    k_lo, k_hi = round(a.start * b.spd), round((a.start + a.random_span) * b.spd)
+    angles = [b.rng.randrange(k_lo, k_hi) / b.spd for _ in range(a.points)]
+    r.info(f"{a.points} ângulos aleatórios entre {a.start:g}° e {a.start + a.random_span:g}°, "
+           f"sempre chegando por baixo (pré-aproximação de {a.pre:g}°); por ponto: espera {a.settle:g} s e "
+           f"média de {a.averages} leituras em {a.measure_time:g} s")
+    rows = []
+    t0 = time.perf_counter()
+    for i, angle in enumerate(angles):
+        reached = b.goto(angle, +1)
+        time.sleep(a.settle)
+        values = timed_readings(b.det, a.averages, a.measure_time)
+        rows.append((i + 1, angle, reached, statistics.fmean(values), stdev(values), len(values),
+                     time.perf_counter() - t0))
+        elapsed = time.perf_counter() - t0
+        left = elapsed / (i + 1) * (len(angles) - i - 1)
+        progress(f"ponto {i + 1}/{len(angles)} ({angle:.2f}°), faltam ~{left / 60:.1f} min")
+    progress_end()
+    b.save_csv("random", ["order", "commanded_deg", "reported_deg", "signal_mean", "signal_std",
+                          "readings", "time_s"], rows)
+
+    theta = np.array([row[1] for row in rows])
+    signal = np.array([row[3] for row in rows])
+    errors = np.array([row[4] for row in rows])
+    order = np.array([row[0] for row in rows])
+    expected_period = 360.0 / b.n
+    fit = fit_sine(theta, signal, b.n)
+    fixed = fit_curve(theta, signal, b.n)
+    resid = signal - fit.value(theta)
+
+    unit = b.det.unit
+    r.check(True, f"ajuste S(θ) = a0 + B·cos(k(θ − φ)): a0 = {fit.offset:.4g} ± {fit.offset_err:.2g} {unit}, "
+                  f"B = {fit.amp:.4g} ± {fit.amp_err:.2g} {unit}, φ = {fit.phase:.3f} ± {fit.phase_err:.3f}°")
+    text = (f"período ajustado {fit.period:.3f} ± {fit.period_err:.3f}° (esperado {expected_period:g}° para "
+            f"{a.element}); com o período fixo em {expected_period:g}°: φ = {fixed.phase:.3f}°")
+    off = fit.period - expected_period
+    if abs(off) > max(3 * fit.period_err, 0.005 * expected_period):
+        r.warn(text + f" — {off / expected_period:+.2%}: escala de passos/grau diferente da real "
+                      f"(redução/microstep) ou --element errado")
+    else:
+        r.check(True, text)
+    vis_max = MAX_VISIBILITY.get(a.element, 1.0)
+    text = f"contraste V = B/a0 = {fit.visibility:.3f} (máximo para {a.element}: {vis_max:.2f}); R² = {fit.r2:.5f}"
+    if fit.visibility < 0.5 * vis_max:
+        r.warn(text + " — baixo: alinhe P1/P2, confira --element e a luz ambiente")
+    else:
+        r.check(True, text)
+    residual = fit.rms / fit.amp if fit.amp else float("inf")
+    text = (f"resíduo rms {fit.rms:.3g} {unit} = {residual:.2%} da amplitude "
+            f"(ruído típico de cada ponto: {statistics.fmean(errors) / math.sqrt(a.averages):.3g} {unit})")
+    if residual > RESIDUAL_WARN:
+        r.warn(text + " — os pontos fogem da senoide (lâmina perdeu passos no meio, feixe na borda, "
+                      "potência variando?)")
+    else:
+        r.check(True, text)
+    if len(rows) >= 4:
+        trend = float(np.polyfit(order, resid, 1)[0]) * (len(rows) - 1)
+        text = f"resíduo do primeiro ao último ponto medido variou {trend:+.3g} {unit} ({trend / fit.offset:+.2%} de a0)"
+        if abs(trend) > 3 * fit.rms and abs(trend / fit.offset) > 0.01:
+            r.warn(text + " — deriva no tempo (laser aquecendo, lâmina perdendo passos)")
+        else:
+            r.info(text)
+    p = fit.period
+    r.info(f"máximo em {fit.phase % p:.2f}° e mínimo em {(fit.phase + p / 2) % p:.2f}° (+ múltiplos de {p:.2f}°)")
+    for key, value in (("points", a.points), ("averages", a.averages), ("measure_time_s", a.measure_time),
+                       ("offset", fit.offset), ("amplitude", fit.amp), ("phase_deg", fit.phase),
+                       ("phase_err_deg", fit.phase_err), ("period_deg", fit.period),
+                       ("period_err_deg", fit.period_err), ("visibility", fit.visibility), ("r2", fit.r2),
+                       ("residual_rel", residual), ("phase_fixed_period_deg", fixed.phase)):
+        r.metric(key, value)
+
+    plt = pyplot()
+    if plt:
+        fig = plt.figure(figsize=(10, 7.5), facecolor=SURFACE)
+        grid = fig.add_gridspec(2, 2, height_ratios=[2.2, 1])
+        ax1 = fig.add_subplot(grid[0, :])
+        ax2 = fig.add_subplot(grid[1, 0])
+        ax3 = fig.add_subplot(grid[1, 1], sharey=ax2)
+        dense = np.linspace(a.start, a.start + a.random_span, 1500)
+        ax1.errorbar(theta, signal, yerr=errors, fmt="o", ms=4, color=UP_COLOR, ecolor=GRID, capsize=0,
+                     label=f"{len(rows)} pontos medidos (barra = desvio das {a.averages} leituras)")
+        ax1.plot(dense, fit.value(dense), color=DOWN_COLOR, lw=1.8,
+                 label=f"ajuste: período {fit.period:.2f}°, φ = {fit.phase:.2f}°")
+        ax1.axhline(fit.offset, color=MUTED, lw=0.8, ls=":", label=f"a0 (média do sinal)")
+        low, high = float(np.min(signal - errors)), float(np.max(signal + errors))
+        span = (high - low) or abs(high) or 1.0
+        ax1.set_ylim(low - 0.05 * span, high + 0.6 * span)      # espaço em cima para legenda e parâmetros
+        ax1.text(0.99, 0.97,
+                 f"S(θ) = a0 + B·cos(k(θ − φ))\n"
+                 f"a0 = {fit.offset:.4g} ± {fit.offset_err:.2g} {unit}\n"
+                 f"B  = {fit.amp:.4g} ± {fit.amp_err:.2g} {unit}\n"
+                 f"φ  = {fit.phase:.3f} ± {fit.phase_err:.3f}°\n"
+                 f"período = {fit.period:.3f} ± {fit.period_err:.3f}° (esperado {expected_period:g}°)\n"
+                 f"contraste {fit.visibility:.3f} · R² {fit.r2:.5f}",
+                 transform=ax1.transAxes, ha="right", va="top", fontsize=8.5, family="monospace",
+                 color=INK, bbox=dict(boxstyle="round,pad=0.4", fc=SURFACE, ec=AXIS))
+        styled_axes(ax1, f"Ângulos aleatórios + ajuste senoidal ({b.plate.axis}, {a.element})",
+                    "ângulo comandado (°)", f"sinal ({unit})")
+        ax1.legend(frameon=False, labelcolor=INK, loc="upper left", fontsize=8.5)
+        ax2.axhline(0, color=AXIS, lw=1)
+        ax2.plot(theta, resid, "o", ms=3.5, color=UP_COLOR)
+        styled_axes(ax2, "Resíduo × ângulo", "ângulo comandado (°)", f"medido − ajuste ({unit})")
+        ax3.axhline(0, color=AXIS, lw=1)
+        ax3.plot(order, resid, "-o", ms=3, lw=0.8, color=INK)
+        styled_axes(ax3, "Resíduo × ordem da medida (tempo)", "ponto nº (na ordem em que foi medido)", "")
+        save_figure(plt, fig, b.out_dir / "random.png", caption=(
+            f"EM CIMA: intensidade medida em {len(rows)} ângulos sorteados (azul), em qualquer ordem e sempre "
+            f"chegando pelo mesmo lado para a folga não entrar. Cada ponto é a média de {a.averages} leituras "
+            f"em {a.measure_time:g} s; a barra é o desvio dessas leituras. A curva laranja é a senoide "
+            f"ajustada a todos os pontos, com o período também livre: se a lâmina vai mesmo ao ângulo "
+            f"pedido, o período sai {expected_period:g}° ({a.element}). Período diferente = escala de "
+            f"passos/grau errada. φ é onde fica o máximo — use para alinhar os eixos da lâmina.\n"
+            f"EMBAIXO À ESQUERDA: medido − ajuste em função do ângulo. Deve ser ruído em torno de zero; uma "
+            f"onda aqui indica feixe fora do centro, lâmina inclinada ou engrenagem excêntrica.\n"
+            f"EMBAIXO À DIREITA: o mesmo resíduo na ordem em que os pontos foram medidos. Inclinação = "
+            f"potência do laser variando no tempo; um degrau = a lâmina perdeu passos daquele ponto em diante."))
 def test_crosstalk(b: Bench, r: Result):
     if b.other is None:
         raise SkipTest("passe --other EIXO (a outra lâmina, fora do feixe ou no mesmo feixe)")
@@ -1105,6 +1399,13 @@ def parse_args(argv=None):
     g.add_argument("--hold", type=float, help="s parada em cada estado no stability (padrão 30)")
     g.add_argument("--idle-wait", type=float, default=0.5, help="s depois de desligar o driver (padrão 0.5)")
     g.add_argument("--seed", type=int, help="semente dos movimentos aleatórios")
+    g.add_argument("--points", type=int, help="random: quantos ângulos aleatórios (pergunta se faltar)")
+    g.add_argument("--averages", type=int, help="random: leituras promediadas por ponto (pergunta se faltar)")
+    g.add_argument("--measure-time", type=float,
+                   help="random: s em que essas leituras são espalhadas (pergunta se faltar)")
+    g.add_argument("--random-span", type=float, default=360.0,
+                   help="random: faixa sorteada a partir de --start (padrão 360°)")
+    g.add_argument("--no-ask", action="store_true", help="não pergunta nada: usa os padrões")
 
     g = ap.add_argument_group("seleção")
     g.add_argument("--only", nargs="+", metavar="TESTE")
@@ -1125,6 +1426,58 @@ def parse_args(argv=None):
     if args.seed is None:
         args.seed = random.randrange(100000)
     return args
+
+
+RANDOM_DEFAULTS = {"points": 60, "averages": None, "measure_time": 1.0}   # averages: --samples
+
+
+def ask_number(question: str, default: float, integer: bool, minimum: float) -> float:
+    while True:
+        try:
+            text = input(f"  ? {question} [Enter = {default:g}]: ").strip().replace(",", ".")
+        except EOFError:
+            return default
+        if not text:
+            return default
+        try:
+            value = float(text)
+        except ValueError:
+            print("    ! digite um número")
+            continue
+        if integer and value != int(value):
+            print("    ! digite um número inteiro")
+            continue
+        if value < minimum:
+            print(f"    ! tem que ser ≥ {minimum:g}")
+            continue
+        return int(value) if integer else value
+
+
+def ask_up_front(args, selected: Sequence[TestSpec]):
+    """
+    Todas as perguntas acontecem aqui, antes do primeiro movimento: depois disso
+    a bancada roda sozinha (dá para sair da sala).
+    """
+    if not any(t.name == "random" for t in selected):
+        return
+    defaults = dict(RANDOM_DEFAULTS, averages=args.samples)
+    missing = [k for k in defaults if getattr(args, k) is None]
+    if missing and (args.no_ask or not sys.stdin.isatty()):
+        for k in missing:
+            setattr(args, k, defaults[k])
+        missing = []
+    if missing:
+        print("\nTeste random (ângulos aleatórios + ajuste senoidal) — responda agora; depois roda sozinho:")
+        if args.points is None:
+            args.points = ask_number("quantos pontos (ângulos aleatórios)?", defaults["points"], True, 4)
+        if args.averages is None:
+            args.averages = ask_number("quantas leituras promediar em cada ponto?", defaults["averages"], True, 1)
+        if args.measure_time is None:
+            args.measure_time = ask_number(f"em quantos segundos espalhar essas {args.averages} leituras "
+                                           f"(tempo de medida por ponto)?", defaults["measure_time"], False, 0)
+    per_point = args.settle + args.measure_time + 0.6         # ~0.6 s de movimento com pré-aproximação
+    print(f"  random: {args.points} pontos × ({args.averages} leituras em {args.measure_time:g} s + "
+          f"{args.settle:g} s de espera) ≈ {args.points * per_point / 60:.1f} min")
 
 
 def select_tests(args) -> List[TestSpec]:
@@ -1182,6 +1535,11 @@ def main(argv=None) -> int:
     print(f"Lâmina {port}:{axis} com {args.element}, detector {args.detector} — "
           f"{len(selected)} testes, semente {args.seed}")
     print(f"Resultados em {out_dir}")
+    ask_up_front(args, selected)
+    if args.detector == "manual":
+        print("(detector manual: cada leitura é digitada por você — não dá para deixar rodando sozinho)")
+    else:
+        print("\nSem mais perguntas daqui para frente: pode deixar a bancada rodando.\n")
 
     try:
         detector = DETECTORS[args.detector](args)
