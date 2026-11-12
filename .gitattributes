@@ -1,0 +1,12 @@
+# Normaliza finais de linha: LF no repositório, conversão automática no checkout
+* text=auto
+
+# Scripts do Windows mantêm CRLF
+*.bat text eol=crlf
+*.cmd text eol=crlf
+
+# Binários
+*.png binary
+*.jpg binary
+*.avi binary
+*.pdf binary
