@@ -16,7 +16,7 @@ MONTAGEM
     Deixe o laser aquecer, centre o feixe na lâmina e evite luz ambiente.
 
 DETECTOR
-    --detector powermeter  Thorlabs PM pelo tests/EASYPM.py (padrão; TLPMX.py vem de --lab-dir)
+    --detector powermeter  Thorlabs PM pelo tests/EASYPM.py + tests/TLPMX.py (padrão)
     --detector timetagger  taxa de contagem de um canal da Swabian TimeTagger
     --detector manual      você digita a leitura (para testar sem instrumento)
 
@@ -76,7 +76,6 @@ from waveplate import WavePlate, WavePlateError
 DEFAULT_PORT = "COM4"
 DEFAULT_PLATE = "X"
 MICROSTEP = 8                 # EIXOS_CFG: microstep (micropassos por passo inteiro)
-LAB_DIR = Path(__file__).resolve().parent.parent / "bell-measurements-main"   # TLPMX.py; pasta local, fora do git
 RESULTS_DIR = Path(__file__).resolve().parent.parent / "test_results"   # na raiz do projeto
 
 HARMONIC = {"hwp": 4, "qwp": 4, "polarizer": 2}
@@ -109,12 +108,9 @@ class PowerMeterDetector(Detector):
     name, unit = "power meter", "W"
 
     def __init__(self, args):
-        # EASYPM.py está aqui em tests/; o TLPMX.py (wrapper da DLL da Thorlabs)
-        # vem da pasta local do laboratório, adicionada no FIM do sys.path para
-        # não trocar o EASYPM.py daqui pelo de lá.
+        # EASYPM.py e TLPMX.py (wrapper da DLL da Thorlabs) ficam aqui em tests/
         sys.path.insert(0, str(Path(__file__).resolve().parent))
-        sys.path.append(str(Path(args.lab_dir).resolve()))
-        from EASYPM import PowerMeter            # precisa do TLPMX.py e da DLL da Thorlabs
+        from EASYPM import PowerMeter            # precisa da DLL TLPMX_64 instalada pela Thorlabs
         self.pm = PowerMeter(args.wavelength)
 
     def read(self) -> float:
@@ -1086,7 +1082,6 @@ def parse_args(argv=None):
     g.add_argument("--harmonic", type=int, help="força o n de cos(nθ) (normalmente vem de --element)")
     g.add_argument("--detector", choices=sorted(DETECTORS), default="powermeter")
     g.add_argument("--wavelength", type=float, default=780.0, help="nm, para o power meter (padrão 780)")
-    g.add_argument("--lab-dir", default=str(LAB_DIR), help="pasta com o TLPMX.py da Thorlabs (padrão: bell-measurements-main/)")
     g.add_argument("--channel", type=int, default=1, help="canal da TimeTagger (padrão 1)")
     g.add_argument("--gate", type=float, default=0.2, help="s de contagem por leitura na TimeTagger")
     g.add_argument("--samples", type=int, default=5, help="leituras promediadas por ponto (padrão 5)")

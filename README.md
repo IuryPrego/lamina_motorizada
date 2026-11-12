@@ -59,6 +59,7 @@ Os módulos são instalados no nível superior: `import waveplate` e
 | [hysteresis_test_x.py](tests/hysteresis_test_x.py) | Mesmos testes ópticos, só com a lâmina X |
 | [analyze_results.py](tests/analyze_results.py) | Resume a histerese máxima medida em `test_results/` |
 | [EASYPM.py](tests/EASYPM.py) | Leitura do power meter Thorlabs (`PowerMeter`), usada pelos testes de histerese |
+| [TLPMX.py](tests/TLPMX.py) | Wrapper Python da DLL do power meter, fornecido pela Thorlabs (usado pelo `EASYPM.py`) |
 
 ### tutorials/ — tutoriais
 
@@ -70,8 +71,7 @@ Os módulos são instalados no nível superior: `import waveplate` e
 
 > **bell-measurements-main/** (códigos e notebooks do laboratório que usam as Elliptec)
 > não faz parte deste repositório: fica só na máquina local, na raiz do projeto.
-> O `tests/EASYPM.py` (power meter) ainda precisa do `TLPMX.py` dessa pasta, o wrapper da
-> DLL da Thorlabs (outra pasta: `--lab-dir`).
+> Os testes não dependem dela.
 
 ## Firmware
 
@@ -131,8 +131,8 @@ Instalar o uv no Windows (uma vez): `powershell -c "irm https://astral.sh/uv/ins
 Para adicionar um pacote: `uv add <pacote>` (ou `uv add --group lab <pacote>`).
 
 Não vêm do PyPI e precisam do instalador do fabricante: o SDK da **Swabian TimeTagger**
-(`--detector timetagger`) e o driver/DLL do **power meter Thorlabs** (usado pelo
-`TLPMX.py`, que o `tests/EASYPM.py` usa).
+(`--detector timetagger`) e o driver do **power meter Thorlabs** (software Optical Power
+Monitor), que instala a DLL `TLPMX_64.dll` carregada pelo `tests/TLPMX.py`.
 
 ```python
 from waveplate import WavePlate
