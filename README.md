@@ -58,6 +58,7 @@ Os módulos são instalados no nível superior: `import waveplate` e
 | [hysteresis_test.py](tests/hysteresis_test.py) | Testes ópticos de folga/histerese com polarizadores e detector |
 | [hysteresis_test_x.py](tests/hysteresis_test_x.py) | Mesmos testes ópticos, só com a lâmina X |
 | [analyze_results.py](tests/analyze_results.py) | Resume a histerese máxima medida em `test_results/` |
+| [EASYPM.py](tests/EASYPM.py) | Leitura do power meter Thorlabs (`PowerMeter`), usada pelos testes de histerese |
 
 ### tutorials/ — tutoriais
 
@@ -69,7 +70,8 @@ Os módulos são instalados no nível superior: `import waveplate` e
 
 > **bell-measurements-main/** (códigos e notebooks do laboratório que usam as Elliptec)
 > não faz parte deste repositório: fica só na máquina local, na raiz do projeto.
-> `tests/hysteresis_test.py` usa o `EASYPM.py` dessa pasta para ler o power meter Thorlabs.
+> O `tests/EASYPM.py` (power meter) ainda precisa do `TLPMX.py` dessa pasta, o wrapper da
+> DLL da Thorlabs (outra pasta: `--lab-dir`).
 
 ## Firmware
 
@@ -130,7 +132,7 @@ Para adicionar um pacote: `uv add <pacote>` (ou `uv add --group lab <pacote>`).
 
 Não vêm do PyPI e precisam do instalador do fabricante: o SDK da **Swabian TimeTagger**
 (`--detector timetagger`) e o driver/DLL do **power meter Thorlabs** (usado pelo
-`TLPMX.py`/`EASYPM.py`).
+`TLPMX.py`, que o `tests/EASYPM.py` usa).
 
 ```python
 from waveplate import WavePlate

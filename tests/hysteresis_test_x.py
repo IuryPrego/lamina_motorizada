@@ -17,7 +17,7 @@ MONTAGEM
     feixe na lâmina e evite luz ambiente.
 
 DETECTOR
-    --detector powermeter  Thorlabs PM pelo EASYPM.py de bell-measurements-main (padrão)
+    --detector powermeter  Thorlabs PM pelo tests/EASYPM.py (padrão; TLPMX.py vem de --lab-dir)
     --detector timetagger  taxa de contagem de um canal da Swabian TimeTagger
     --detector manual      você digita a leitura
 
